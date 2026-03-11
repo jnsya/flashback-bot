@@ -37,6 +37,7 @@ python -m flashback_bot.main
 
 - `/flashback` — sends a random photo immediately
 - `/reminder` — sends a random reminder immediately
+- `/remove` — deletes the last sent flashback or reminder from the pool (use `/remove flashback` or `/remove reminder` to be specific)
 - `/count` — shows how many photos and reminders are in the pool
 
 ## Deploying to Railway

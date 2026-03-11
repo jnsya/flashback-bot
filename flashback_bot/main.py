@@ -77,6 +77,12 @@ def get_reminder_count() -> int:
     return len(_list_files(REMINDERS_DIR, IMAGE_EXTS | TEXT_EXTS))
 
 
+# ── Last-sent tracking ────────────────────────────────────────────────
+
+# Tracks the most recently sent item per type so /remove can delete it.
+_last_sent: dict[str, Path | None] = {"flashback": None, "reminder": None}
+
+
 # ── Sending ───────────────────────────────────────────────────────────
 
 async def send_flashback(bot: Bot, chat_id: str):
@@ -89,6 +95,7 @@ async def send_flashback(bot: Bot, chat_id: str):
             chat_id=chat_id, photo=f,
             caption="*Flashback* \u2728", parse_mode="Markdown",
         )
+    _last_sent["flashback"] = photo_path
     log.info("Sent flashback: %s", photo_path.name)
 
 
@@ -105,6 +112,7 @@ async def send_reminder(bot: Bot, chat_id: str):
     else:
         with open(item, "rb") as f:
             await bot.send_photo(chat_id=chat_id, photo=f)
+    _last_sent["reminder"] = item
     log.info("Sent reminder: %s", item.name)
 
 
@@ -139,9 +147,47 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Commands:\n"
         f"/flashback — random photo now\n"
         f"/reminder — random reminder now\n"
+        f"/remove — delete the last sent item from the pool\n"
         f"/count — see pool sizes\n\n"
         f"Photos: {total_photos} · Reminders: {total_reminders}",
     )
+
+
+@authorized
+async def cmd_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /remove — delete the last sent flashback or reminder from the pool."""
+    # Check which type was sent most recently
+    fb = _last_sent.get("flashback")
+    rm = _last_sent.get("reminder")
+
+    # If the user replies to a specific message, we can't match it to a file,
+    # so just remove whichever was sent last. User can specify /remove flashback
+    # or /remove reminder to be explicit.
+    args = context.args
+    if args and args[0].lower() in ("flashback", "photo"):
+        target, kind = fb, "flashback"
+    elif args and args[0].lower() == "reminder":
+        target, kind = rm, "reminder"
+    else:
+        # Remove whichever was sent most recently (no arg given)
+        target, kind = fb, "flashback"
+        if rm and (not fb or (rm.stat().st_atime if rm.exists() else 0) > (fb.stat().st_atime if fb.exists() else 0)):
+            target, kind = rm, "reminder"
+
+    if target is None:
+        await update.message.reply_text("Nothing to remove — no recent flashback or reminder.")
+        return
+
+    if not target.exists():
+        _last_sent[kind] = None
+        await update.message.reply_text("Already removed.")
+        return
+
+    name = target.name
+    target.unlink()
+    _last_sent[kind] = None
+    await update.message.reply_text(f"Removed {kind}: {name}")
+    log.info("Removed %s: %s", kind, name)
 
 
 @authorized
@@ -229,6 +275,7 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("flashback", cmd_flashback))
     app.add_handler(CommandHandler("reminder", cmd_reminder))
+    app.add_handler(CommandHandler("remove", cmd_remove))
     app.add_handler(CommandHandler("count", cmd_count))
 
     app.run_polling()
