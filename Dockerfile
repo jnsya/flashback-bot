@@ -7,4 +7,6 @@ COPY flashback_bot/ flashback_bot/
 
 RUN pip install --no-cache-dir .
 
-CMD ["python", "-m", "flashback_bot.main"]
+COPY entrypoint.sh .
+
+CMD ["sh", "entrypoint.sh"]
