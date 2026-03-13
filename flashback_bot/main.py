@@ -26,7 +26,7 @@ CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 AUTHORIZED_USER_ID = int(CHAT_ID)
 TIMEZONE = os.environ.get("TZ", "Europe/Berlin")
 
-eASE_DIR = Path(__file__).parent.parent
+BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR))
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".heif", ".webp", ".gif"}
