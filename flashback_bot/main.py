@@ -141,7 +141,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"Hey! I'm Flashback \u2728\n\n"
         f"I'll send you a random photo at a surprise time each day "
-        f"between 8am and midnight ({TIMEZONE}).\n\n"
+        f"between 10am and 10pm ({TIMEZONE}).\n\n"
         f"I also send random reminders from your collection "
         f"on a separate schedule.\n\n"
         f"Commands:\n"
@@ -201,8 +201,17 @@ async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── Scheduling ────────────────────────────────────────────────────────
 
+def _random_time_tomorrow(tz, hour_start, hour_end):
+    """Return a random datetime tomorrow between hour_start:00 and hour_end:59."""
+    now = datetime.now(tz)
+    tomorrow = now + timedelta(days=1)
+    hour = random.randint(hour_start, hour_end)
+    minute = random.randint(0, 59)
+    return tomorrow.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
 def _random_time_today_or_tomorrow(tz, hour_start, hour_end):
-    """Return a random datetime between hour_start:00 and hour_end:59, today or tomorrow."""
+    """Return a random datetime between hour_start:00 and hour_end:59, today if possible, else tomorrow."""
     now = datetime.now(tz)
     hour = random.randint(hour_start, hour_end)
     minute = random.randint(0, 59)
@@ -212,10 +221,13 @@ def _random_time_today_or_tomorrow(tz, hour_start, hour_end):
     return candidate
 
 
-def schedule_next_flashback(scheduler, bot, chat_id):
-    """Schedule the next flashback at a random time between 8:00 and 23:59."""
+def schedule_next_flashback(scheduler, bot, chat_id, *, allow_today=False):
+    """Schedule the next flashback at a random time between 10:00 and 22:00."""
     tz = pytz.timezone(TIMEZONE)
-    run_date = _random_time_today_or_tomorrow(tz, 8, 23)
+    if allow_today:
+        run_date = _random_time_today_or_tomorrow(tz, 10, 22)
+    else:
+        run_date = _random_time_tomorrow(tz, 10, 22)
 
     async def flashback_and_reschedule():
         await send_flashback(bot, chat_id)
@@ -228,26 +240,28 @@ def schedule_next_flashback(scheduler, bot, chat_id):
     log.info("Next flashback scheduled at %s", run_date.strftime("%Y-%m-%d %H:%M %Z"))
 
 
-def schedule_next_reminder(scheduler, bot, chat_id):
-    """Schedule the next reminder at a random time between 9:00 and 22:59."""
+def schedule_next_reminder(scheduler, bot, chat_id, *, allow_today=False):
+    """Schedule the next reminder at a random time between 10:00 and 22:00."""
     tz = pytz.timezone(TIMEZONE)
 
     # Skip scheduling if no reminders exist
     if get_reminder_count() == 0:
         log.info("No reminders in pool, will check again tomorrow")
-        # Check again tomorrow at 9am
         now = datetime.now(tz)
         check_time = (now + timedelta(days=1)).replace(
-            hour=9, minute=0, second=0, microsecond=0,
+            hour=10, minute=0, second=0, microsecond=0,
         )
         scheduler.add_job(
-            lambda: schedule_next_reminder(scheduler, bot, chat_id),
+            lambda: schedule_next_reminder(scheduler, bot, chat_id, allow_today=True),
             "date", run_date=check_time,
             id="next_reminder", replace_existing=True,
         )
         return
 
-    run_date = _random_time_today_or_tomorrow(tz, 9, 22)
+    if allow_today:
+        run_date = _random_time_today_or_tomorrow(tz, 10, 22)
+    else:
+        run_date = _random_time_tomorrow(tz, 10, 22)
 
     async def reminder_and_reschedule():
         await send_reminder(bot, chat_id)
@@ -265,8 +279,8 @@ def schedule_next_reminder(scheduler, bot, chat_id):
 async def post_init(app: Application):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.start()
-    schedule_next_flashback(scheduler, app.bot, CHAT_ID)
-    schedule_next_reminder(scheduler, app.bot, CHAT_ID)
+    schedule_next_flashback(scheduler, app.bot, CHAT_ID, allow_today=True)
+    schedule_next_reminder(scheduler, app.bot, CHAT_ID, allow_today=True)
 
 
 def main():
