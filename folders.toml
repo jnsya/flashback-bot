@@ -11,6 +11,10 @@ command = "flashback"
 [folders.reminders]
 command = "reminder"
 
+[folders.screenshots]
+caption = "💡"
+command = "screenshot"
+
 # Example: just add a memes/ directory and optionally:
 # [folders.memes]
 # caption = "😂"

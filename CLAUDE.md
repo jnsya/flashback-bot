@@ -6,7 +6,7 @@ Read `README.md` for project structure, configuration, env vars, and deployment 
 
 This project is deployed on Railway with a persistent volume mounted at `/data`.
 
-When debugging deployment issues, use the Railway CLI to inspect the live environment:
+When debugging issues, use the Railway CLI to inspect the live environment (do this yourself and do not ask the user to check):
 
 ```bash
 railway status                    # check linked project/service

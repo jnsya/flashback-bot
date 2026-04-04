@@ -207,7 +207,10 @@ def schedule_next(scheduler, bot, chat_id, folder: FolderConfig, *, allow_today=
     )
 
     async def send_and_reschedule(_f=folder):
-        await send_from_folder(bot, chat_id, _f)
+        try:
+            await send_from_folder(bot, chat_id, _f)
+        except Exception:
+            log.exception("Failed to send from %s, will retry next cycle", _f.name)
         schedule_next(scheduler, bot, chat_id, _f)
 
     scheduler.add_job(
@@ -321,6 +324,7 @@ async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def post_init(app: Application):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     scheduler.start()
+    app.bot_data["scheduler"] = scheduler  # prevent garbage collection
     for folder in _folders.values():
         schedule_next(scheduler, app.bot, CHAT_ID, folder, allow_today=True)
 
